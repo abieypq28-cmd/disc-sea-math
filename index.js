@@ -126,29 +126,30 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply(`🔧 **Hệ thống Quản Trị:** Admin đã điều chỉnh ví của <@${targetUser.id}> thành **${amount} Sea Coins** 🪙.`);
     }
 
-    // LỆNH MỞ GIẢI ĐẤU (/batdau)
+    // LỆNH MỞ GIẢI ĐẤU GIẢI TRÍ (/batdau) - ĐÃ THAY THẾ BẢN TỐI ƯU MỚI
     if (commandName === 'batdau') {
         if (isTournamentRunning) {
             return interaction.reply({ content: '⚠️ Hệ thống đang chạy một giải đấu rồi! Không thể mở thêm giải đấu song song.', ephemeral: true });
         }
 
-        // FIX LỖI "DID NOT RESPOND": Xin thêm thời gian xử lý từ Discord API ngay lập tức
+        // Khóa chốt hệ thống ngay lập tức
+        isTournamentRunning = true; 
+
+        // Báo nhận lệnh ngay để tránh xoay vòng (Fix triệt để lỗi "Did not respond")
         await interaction.deferReply();
 
-        isTournamentRunning = true; 
         const votes = { de: new Set(), trungbinh: new Set(), kho: new Set() };
 
-        const btnDe = new ButtonBuilder().setCustomId('vote_de').setLabel('🟢 Dễ (0)').setStyle(ButtonStyle.Success);
-        const btnTrungBinh = new ButtonBuilder().setCustomId('vote_trungbinh').setLabel('🟡 Trung Bình (0)').setStyle(ButtonStyle.Warning);
-        const btnKho = new ButtonBuilder().setCustomId('vote_kho').setLabel('🔴 Khó (0)').setStyle(ButtonStyle.Danger);
+        // Tạo các nút bấm chuẩn hóa, rút gọn tối đa ký tự customId để tránh lỗi dữ liệu của Discord v14
+        const btnDe = new ButtonBuilder().setCustomId('v_de').setLabel('🟢 Dễ (0)').setStyle(ButtonStyle.Success);
+        const btnTrungBinh = new ButtonBuilder().setCustomId('v_trungbinh').setLabel('🟡 Trung Bình (0)').setStyle(ButtonStyle.Warning);
+        const btnKho = new ButtonBuilder().setCustomId('v_kho').setLabel('🔴 Khó (0)').setStyle(ButtonStyle.Danger);
 
         const row = new ActionRowBuilder().addComponents(btnDe, btnTrungBinh, btnKho);
 
-        // Sử dụng editReply thay cho reply truyền thống vì đã kích hoạt deferReply ở trên
         const voteMessage = await interaction.editReply({
-            content: `🏆 **KHỞI ĐỘNG GIẢI ĐẤU TOÁN HỌC SEA COINS (20 VÒNG)** 🏆\nCác kỳ phùng thủ hãy có **30 giây** để bỏ phiếu biểu quyết độ khó chung cho toàn bộ giải đấu này!`,
-            components: [row],
-            fetchReply: true
+            content: `🏆 **KHỞI ĐỘNG GIẢI ĐẤU TOÁN HỌC (20 VÒNG)** 🏆\nCác kỳ phùng thủ có **30 giây** để bấm nút bỏ phiếu chọn độ khó chung!`,
+            components: [row]
         });
 
         const voteCollector = voteMessage.createMessageComponentCollector({
@@ -158,32 +159,37 @@ client.on('interactionCreate', async (interaction) => {
 
         voteCollector.on('collect', async (btnInteract) => {
             const vterId = btnInteract.user.id;
-            const chosenDiff = btnInteract.customId.split('_')[1];
+            const chosenDiff = btnInteract.customId.split('_')[1]; // Tách lấy 'de', 'trungbinh' hoặc 'kho'
+            
+            // Xóa phiếu cũ của người này nếu có và nạp vào mục mới chọn
             for (const diff in votes) { votes[diff].delete(vterId); }
             votes[chosenDiff].add(vterId);
 
             const uRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('vote_de').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('vote_trungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(ButtonStyle.Warning),
-                new ButtonBuilder().setCustomId('vote_kho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(ButtonStyle.Danger)
+                new ButtonBuilder().setCustomId('v_de').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId('v_trungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(ButtonStyle.Warning),
+                new ButtonBuilder().setCustomId('v_kho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(ButtonStyle.Danger)
             );
-            await btnInteract.update({ components: [uRow] });
+            
+            await btnInteract.update({ components: [uRow] }).catch(() => {});
         });
 
         voteCollector.on('end', async () => {
-            let finalDiff = 'de'; let maxVotes = votes.de.size;
+            let finalDiff = 'de'; 
+            let maxVotes = votes.de.size;
+            
             if (votes.trungbinh.size > maxVotes) { finalDiff = 'trungbinh'; maxVotes = votes.trungbinh.size; }
             if (votes.kho.size > maxVotes) { finalDiff = 'kho'; }
 
-            let reward = 15; let initialLives = 5; let diffLabel = '🟢 DỄ (Ăn 15🪙/câu | 5 ❤️/vòng)';
-            if (finalDiff === 'trungbinh') { reward = 50; initialLives = 3; diffLabel = '🟡 TRUNG BÌNH (Ăn 50🪙/câu | 3 ❤️/vòng)'; }
-            if (finalDiff === 'kho') { reward = 100; initialLives = 2; diffLabel = '🔴 KHÓ VÔ HẠN (Ăn 100🪙/câu | 2 ❤️/vòng)'; }
+            let reward = 15; let initialLives = 5; let diffLabel = '🟢 DỄ';
+            if (finalDiff === 'trungbinh') { reward = 50; initialLives = 3; diffLabel = '🟡 TRUNG BÌNH'; }
+            if (finalDiff === 'kho') { reward = 100; initialLives = 2; diffLabel = '🔴 KHÓ VÔ HẠN'; }
 
             await interaction.followUp({
-                content: `🔔 **Hết giờ bầu chọn!** Đa số biểu quyết đã chốt cấp độ: **${diffLabel}**.\n🚀 **GIẢI ĐẤU CHÍNH THỨC KHỞI TRANH SAU 3 GIÂY!**`
-            });
+                content: `🔔 **Hết giờ bầu chọn!** Giải đấu chính thức chốt cấp độ: **${diffLabel}**.\n🚀 **TRẬN ĐẤU BẮT ĐẦU SAU 3 GIÂY!**`
+            }).catch(() => {});
 
-            // Triển khai đệ quy bắt đầu vòng 1
+            // Chạy đệ quy bắt đầu vòng 1
             runTournamentRound(interaction.channel, finalDiff, initialLives, reward, 1, {});
         });
     }
@@ -214,7 +220,7 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
         const pId = m.author.id;
         const userAnswer = parseInt(m.content.trim());
 
-        if (isNaN(userAnswer)) return; // Bỏ qua nếu chat bằng chữ chữ viết thông thường
+        if (isNaN(userAnswer)) return; // Bỏ qua nếu chat bằng chữ viết thông thường
 
         // Kích hoạt mạng cá nhân cho người chơi mới gõ ở vòng này
         if (playerLives[pId] === undefined) {
