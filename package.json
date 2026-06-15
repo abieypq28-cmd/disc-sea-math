@@ -1,0 +1,13 @@
+{
+  "name": "bot-sea-math-tournament",
+  "version": "1.0.0",
+  "description": "Bot giai toan tinh mang nhan Sea Coins theo giai dau 20 vong",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "express": "^4.18.2"
+  }
+}
