@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const express = require('express');
 
 // 1. WEB SERVER CHUẨN ĐỂ ĐÓN PING CRON-JOB TRÊN RENDER
@@ -20,6 +20,7 @@ const client = new Client({
 // Cơ sở dữ liệu bộ nhớ tạm cho ví tiền Sea Coins (🪙)
 const seaCoinsBalances = {}; 
 let isTournamentRunning = false; // Trạng thái kiểm soát giải đấu toàn cục
+let currentRoundCollector = null; // Biến lưu trữ bộ quét chat hiện tại để có thể ép dừng từ xa
 
 // 3. ĐĂNG KÝ HỆ THỐNG SLASH COMMANDS
 const commands = [
@@ -34,20 +35,20 @@ const commands = [
         .setDescription('Thay đổi số xu Sea Coins của một ai đó (Chỉ dành cho Admin/Chủ server)')
         .addUserOption(option => option.setName('user').setDescription('Thành viên nhận/bị trừ xu').setRequired(true))
         .addIntegerOption(option => option.setName('amount').setDescription('Số xu mới muốn thiết lập').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('ketthuc')
+        .setDescription('Cưỡng ép DỪNG LẬP TỨC giải đấu toán học hiện tại (Mở khóa cho TẤT CẢ MỌI NGƯỜI)')
+        // ĐÃ XÓA dòng setDefaultMemberPermissions để AI CŨNG CÓ THỂ SỬ DỤNG
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
     console.log(`[HỆ THỐNG] Đã đăng nhập thành công: ${client.user.tag}`);
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
-        // ÉP DISCORD XÓA SẠCH TOÀN BỘ LỆNH CŨ BỊ KẸT TRÊN TOÀN CẦU
         await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
-        console.log('[HỆ THỐNG] Đã dọn rác lệnh cũ.');
-
-        // NẠP LẠI HỆ THỐNG LỆNH MỚI TINH
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('[HỆ THỐNG] Đã đồng bộ cấu trúc Slash Commands MỚI NHẤT thành công!');
+        console.log('[HỆ THỐNG] Đã mở khóa lệnh /ketthuc cho tất cả mọi người chơi!');
     } catch (error) {
         console.error("Lỗi đồng bộ lệnh:", error);
     }
@@ -117,21 +118,47 @@ client.on('interactionCreate', async (interaction) => {
     const userId = user.id;
 
     try {
-        // LỆNH CHECK VÍ TIỀN TỆ (/vi)
         if (commandName === 'vi') {
             const bal = seaCoinsBalances[userId] || 0;
-            return interaction.reply(`🪙 **Tài khoản cá nhân:** Bạn đang sở hữu **${bal} Sea Coins**.`);
+            const embedVi = new EmbedBuilder()
+                .setColor(0x00AE86)
+                .setTitle('🪙 TÀI KHOẢN SEA COINS')
+                .setDescription(`Chào <@${userId}>, số dư hiện tại của bạn là: **${bal} Sea Coins**`)
+                .setTimestamp();
+            return interaction.reply({ embeds: [embedVi] });
         }
 
-        // LỆNH THAY ĐỔI TIỀN CỦA ADMIN (/setxu)
         if (commandName === 'setxu') {
             const targetUser = options.getUser('user');
             const amount = options.getInteger('amount');
             seaCoinsBalances[targetUser.id] = amount;
-            return interaction.reply(`🔧 **Hệ thống Quản Trị:** Admin đã điều chỉnh ví của <@${targetUser.id}> thành **${amount} Sea Coins** 🪙.`);
+            
+            const embedSet = new EmbedBuilder()
+                .setColor(0xFFA500)
+                .setTitle('🔧 ĐIỀU CHỈNH HỆ THỐNG')
+                .setDescription(`Admin đã thiết lập lại số dư của <@${targetUser.id}> thành **${amount} Sea Coins** 🪙.`);
+            return interaction.reply({ embeds: [embedSet] });
         }
 
-        // LỆNH MỞ GIẢI ĐẤU TOÁN HỌC (/batdau)
+        // LỆNH ÉP DỪNG GIẢI ĐẤU (BẤT KỲ AI CŨNG CÓ THỂ GÕ)
+        if (commandName === 'ketthuc') {
+            if (!isTournamentRunning) {
+                return interaction.reply({ content: '⚠️ Hiện tại không có giải đấu nào đang diễn ra để kết thúc.', ephemeral: true });
+            }
+
+            isTournamentRunning = false;
+            if (currentRoundCollector) {
+                currentRoundCollector.stop('forced_end');
+            }
+
+            const embedForcedEnd = new EmbedBuilder()
+                .setColor(0xD35400)
+                .setTitle('🛑 GIẢI ĐẤU ĐÃ BỊ DỪNG')
+                .setDescription(`Thành viên <@${userId}> đã sử dụng lệnh \`/ketthuc\` để hủy trận đấu!\n\nSố dư Sea Coins bạn tích lũy được từ các vòng trước đó vẫn được lưu an toàn trong ví.`);
+
+            return interaction.reply({ embeds: [embedForcedEnd] });
+        }
+
         if (commandName === 'batdau') {
             if (isTournamentRunning) {
                 return interaction.reply({ content: '⚠️ Hệ thống đang chạy một giải đấu rồi! Không thể mở thêm giải đấu song song.', ephemeral: true });
@@ -142,15 +169,22 @@ client.on('interactionCreate', async (interaction) => {
 
             const votes = { de: new Set(), trungbinh: new Set(), kho: new Set() };
 
-            // Sử dụng mã số nguyên (3 = Xanh lá, 4 = Vàng, 2 = Đỏ đục) để tương thích 100% mọi phiên bản thư viện
             const btnDe = new ButtonBuilder().setCustomId('votede').setLabel('🟢 Dễ (0)').setStyle(3);
             const btnTrungBinh = new ButtonBuilder().setCustomId('votetrungbinh').setLabel('🟡 Trung Bình (0)').setStyle(4);
             const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(2);
 
             const row = new ActionRowBuilder().addComponents(btnDe, btnTrungBinh, btnKho);
 
+            const voteEndTime = Math.floor((Date.now() + 30000) / 1000);
+
+            const embedStart = new EmbedBuilder()
+                .setColor(0x3498DB)
+                .setTitle('🏆 GIẢI ĐẤU TOÁN HỌC SEA COINS ĐÃ MỞ')
+                .setDescription(`Các anh tài bấm nút phía dưới để biểu quyết chọn độ khó chung cho giải đấu lần này!\n\n⏱️ **Thời gian đóng hòm phiếu:** <t:${voteEndTime}:R>`)
+                .setFooter({ text: 'Giải đấu tự động vận hành bởi Sea Math Engine' });
+
             const voteMessage = await interaction.editReply({
-                content: `🏆 **KHỞI ĐỘNG GIẢI ĐẤU TOÁN HỌC SEA COINS (20 VÒNG)** 🏆\nCác kỳ phùng thủ hãy có **30 giây** để bỏ phiếu biểu quyết độ khó chung cho toàn bộ giải đấu này!`,
+                embeds: [embedStart],
                 components: [row]
             }).catch(err => console.error("Lỗi gửi bảng vote:", err));
 
@@ -165,6 +199,10 @@ client.on('interactionCreate', async (interaction) => {
             });
 
             voteCollector.on('collect', async (btnInteract) => {
+                if (!isTournamentRunning) {
+                    return voteCollector.stop('forced_end');
+                }
+
                 const vterId = btnInteract.user.id;
                 const clickedId = btnInteract.customId;
                 
@@ -175,7 +213,6 @@ client.on('interactionCreate', async (interaction) => {
                 for (const diff in votes) { votes[diff].delete(vterId); }
                 votes[chosenDiff].add(vterId);
 
-                // Đồng bộ mã số nút khi cập nhật số lượng vote
                 const uRow = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId('votede').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(3),
                     new ButtonBuilder().setCustomId('votetrungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(4),
@@ -185,20 +222,26 @@ client.on('interactionCreate', async (interaction) => {
                 await btnInteract.update({ components: [uRow] }).catch(() => {});
             });
 
-            voteCollector.on('end', async () => {
+            voteCollector.on('end', async (collected, reason) => {
+                if (reason === 'forced_end') return; 
+
                 let finalDiff = 'de'; 
                 let maxVotes = votes.de.size;
                 
                 if (votes.trungbinh.size > maxVotes) { finalDiff = 'trungbinh'; maxVotes = votes.trungbinh.size; }
                 if (votes.kho.size > maxVotes) { finalDiff = 'kho'; }
 
-                let reward = 15; let initialLives = 5; let diffLabel = '🟢 DỄ (Ăn 15🪙/câu | 5 ❤️/vòng)';
-                if (finalDiff === 'trungbinh') { reward = 50; initialLives = 3; diffLabel = '🟡 TRUNG BÌNH (Ăn 50🪙/câu | 3 ❤️/vòng)'; }
-                if (finalDiff === 'kho') { reward = 100; initialLives = 2; diffLabel = '🔴 KHÓ VÔ HẠN (Ăn 100🪙/câu | 2 ❤️/vòng)'; }
+                let reward = 15; let initialLives = 5; let diffLabel = '🟢 DỄ (15🪙/câu | 5 Mạng | 20s)';
+                let colorHex = 0x2ECC71;
+                if (finalDiff === 'trungbinh') { reward = 50; initialLives = 3; diffLabel = '🟡 TRUNG BÌNH (50🪙/câu | 3 Mạng | 20s)'; colorHex = 0xF1C40F; }
+                if (finalDiff === 'kho') { reward = 100; initialLives = 2; diffLabel = '🔴 KHÓ VÔ HẠN (100🪙/câu | 2 Mạng | 20s)'; colorHex = 0xE74C3C; }
 
-                await interaction.followUp({
-                    content: `🔔 **Hết giờ bầu chọn!** Đa số biểu quyết đã chốt cấp độ: **${diffLabel}**.\n🚀 **GIẢI ĐẤU CHÍNH THỨC KHỞI TRANH SAU 3 GIÂY!**`
-                }).catch(() => {});
+                const embedEndVote = new EmbedBuilder()
+                    .setColor(colorHex)
+                    .setTitle('🔔 THỜI GIAN BẦU CHỌN KẾT THÚC')
+                    .setDescription(`Đa số tuyển thủ đã chốt cấp độ: **${diffLabel}**.\n\n🚀 **TRẬN ĐẤU CHÍNH THỨC BẮT ĐẦU SAU 3 GIÂY!**`);
+
+                await interaction.followUp({ embeds: [embedEndVote] }).catch(() => {});
 
                 runTournamentRound(interaction.channel, finalDiff, initialLives, reward, 1, {});
             });
@@ -209,29 +252,38 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// 6. HÀM CHẠY VÒNG ĐẤU TOÁN HỌC LIÊN TỤC (ĐỆ QUY CHẮC CHẮN)
+// 6. HÀM CHẠY VÒNG ĐẤU TOÁN HỌC LIÊN TỤC
 async function runTournamentRound(channel, difficulty, initialLives, reward, currentRound, tournamentStats) {
+    if (!isTournamentRunning) return;
     if (currentRound > 20) { return endTournament(channel, tournamentStats); }
 
-    await new Promise(resolve => setTimeout(resolve, 3000)); 
+    await new Promise(resolve => setTimeout(resolve, 2500)); 
+    if (!isTournamentRunning) return; 
 
     try {
         const qData = generateSeaMath(difficulty);
         console.log(`[LOG VÒNG ${currentRound}] Đề: ${qData.text} | Đáp án: ${qData.answer}`);
 
-        await channel.send({
-            content: `⚔️ **VÒNG ĐẤU: ${currentRound} / 20** ⚔️\n\n🔢 **ĐỀ BÀI:** Tính giá trị của biểu thức toán học sau:\n👉  **${qData.text} = ?** 👈\n\n⏱️ *Thời gian: **45 giây**. Hãy gõ trực tiếp kết quả số!*`
-        });
+        const roundDuration = 20000; 
+        const roundEndTime = Math.floor((Date.now() + roundDuration) / 1000);
+
+        const embedQuestion = new EmbedBuilder()
+            .setColor(0x9B59B6)
+            .setTitle(`⚔️ VÒNG ĐẤU: ${currentRound} / 20 ⚔️`)
+            .setDescription(`Hãy tính giá trị của biểu thức toán học sau:\n\n👉  **\`${qData.text}\` = ?** 👈\n\n⏱️ **Thời gian giới hạn:** <t:${roundEndTime}:R>`)
+            .setFooter({ text: `Phần thưởng vòng: ${reward} Sea Coins 🪙 | Bạn chỉ có đúng 20 giây!` });
+
+        await channel.send({ embeds: [embedQuestion] });
 
         const playerLives = {};
         const activePlayersInRound = new Set();
 
-        const chatCollector = channel.createMessageCollector({
+        currentRoundCollector = channel.createMessageCollector({
             filter: m => !m.author.bot,
-            time: 45000
+            time: roundDuration
         });
 
-        chatCollector.on('collect', async (m) => {
+        currentRoundCollector.on('collect', async (m) => {
             const pId = m.author.id;
             const userAnswer = parseInt(m.content.trim());
 
@@ -242,50 +294,73 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
                 activePlayersInRound.add(pId);
             }
 
-            if (playerLives[pId] <= 0) {
-                return m.reply(`🚫 Bạn đã hết sạch mạng ở vòng này rồi!`).catch(() => {});
-            }
+            if (playerLives[pId] <= 0) return;
 
             if (userAnswer === qData.answer) {
-                chatCollector.stop('winner');
+                currentRoundCollector.stop('winner');
                 if (!seaCoinsBalances[pId]) seaCoinsBalances[pId] = 0;
                 if (!tournamentStats[pId]) tournamentStats[pId] = 0;
 
                 seaCoinsBalances[pId] += reward;
                 tournamentStats[pId] += reward; 
 
-                return m.reply(`🎉 **XUẤT SẮC THẮNG VÒNG ${currentRound}!** 🎉\n👑 <@${pId}> đã nổ đáp án chuẩn xác nhất: **${qData.answer}**.\n💰 Tài khoản được cộng **+${reward} Sea Coins** 🪙.`).catch(() => {});
+                const embedWin = new EmbedBuilder()
+                    .setColor(0x2ECC71)
+                    .setTitle(`🎉 VÒNG ${currentRound} ĐÃ CÓ NHÀ VÔ ĐỊCH 🎉`)
+                    .setDescription(`👑 <@${pId}> đã nổ đáp án chính xác: **\`${qData.answer}\`**\n💰 Tài khoản cá nhân nhận ngay **+${reward} Sea Coins** 🪙.`);
+                return m.reply({ embeds: [embedWin] }).catch(() => {});
             }
 
             playerLives[pId]--;
 
             if (playerLives[pId] <= 0) {
-                m.reply(`💥 <@${pId}> đã gõ sai (${userAnswer}) và **CHÍNH THỨC BỊ LOẠI** tại vòng ${currentRound}! ❌`).catch(() => {});
+                const embedEliminated = new EmbedBuilder()
+                    .setColor(0xE74C3C)
+                    .setDescription(`💥 <@${pId}> đã gõ sai (\`${userAnswer}\`) và **CHÍNH THỨC BỊ LOẠI** tại vòng ${currentRound}! ❌`);
+                m.reply({ embeds: [embedEliminated] }).catch(() => {});
                 
                 const anyoneAlive = Array.from(activePlayersInRound).some(id => playerLives[id] > 0);
                 if (!anyoneAlive && activePlayersInRound.size > 0) {
-                    chatCollector.stop('all_dead');
+                    currentRoundCollector.stop('all_dead');
                 }
             } else {
-                return m.reply(`❌ **Kết quả sai!** <@${pId}> gõ số ${userAnswer}.\n⚠️ Mạng cá nhân còn: **${'❤️'.repeat(playerLives[pId])}**`).catch(() => {});
+                return m.reply(`❌ **Kết quả chưa chính xác!** Bạn gõ số \`${userAnswer}\`.\n⚠️ Số mạng còn lại: **${'❤️'.repeat(playerLives[pId])}**`).catch(() => {});
             }
         });
 
-        chatCollector.on('end', async (collected, reason) => {
+        currentRoundCollector.on('end', async (collected, reason) => {
+            if (reason === 'forced_end') return; 
+
             if (reason === 'time') {
-                await channel.send(`⏱️ **Hết thời gian quy định!** Không anh tài nào giải kịp.\n🤖 Đáp án chuẩn là: **${qData.answer}**.`);
+                const embedTimeout = new EmbedBuilder()
+                    .setColor(0x7F8C8D)
+                    .setTitle('⏱️ HẾT 20 GIÂY QUY ĐỊNH')
+                    .setDescription(`Tốc độ quá nhanh! Không anh tài nào giải kịp bài toán.\n🤖 Đáp án chuẩn xác là: **\`${qData.answer}\`**`);
+                await channel.send({ embeds: [embedTimeout] });
             } 
             else if (reason === 'all_dead') {
-                await channel.send(`💀 **TẤT CẢ ĐỀ VỀ VƯỜN!** Toàn bộ người tham gia vòng này đều đã cạn sạch mạng.\n🤖 Đáp án của bài toán là: **${qData.answer}**.`);
+                const embedAllDead = new EmbedBuilder()
+                    .setColor(0x34495E)
+                    .setTitle('💀 TẤT CẢ ĐỀ VỀ VƯỜN')
+                    .setDescription(`Toàn bộ người chơi tham gia vòng này đều đã cạn sạch mạng.\n🤖 Đáp án đúng là: **\`${qData.answer}\`**`);
+                await channel.send({ embeds: [embedAllDead] });
             }
 
-            await channel.send(`⏩ *Hệ thống đang nạp dữ liệu Vòng ${currentRound + 1}...*`);
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            if (!isTournamentRunning) return; 
+
+            if (currentRound < 20) {
+                await channel.send(`⏩ *Hệ thống đang chuẩn bị dữ liệu Vòng ${currentRound + 1}...*`);
+            }
+            
             runTournamentRound(channel, difficulty, initialLives, reward, currentRound + 1, tournamentStats);
         });
 
     } catch (roundError) {
         console.error(`Lỗi vòng ${currentRound}:`, roundError);
-        runTournamentRound(channel, difficulty, initialLives, reward, currentRound + 1, tournamentStats);
+        if (isTournamentRunning) {
+            runTournamentRound(channel, difficulty, initialLives, reward, currentRound + 1, tournamentStats);
+        }
     }
 }
 
@@ -297,18 +372,24 @@ async function endTournament(channel, tournamentStats) {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5); 
 
-    let leaderboardText = '🏆 **TỔNG KẾT GIẢI ĐẤU TOÁN HỌC SEA COINS** 🏆\n\n';
+    const embedLeaderboard = new EmbedBuilder()
+        .setColor(0xF1C40F)
+        .setTitle('🏆 BẢNG XẾP HẠNG GIẢI ĐẤU TOÁN HỌC SEA COINS 🏆')
+        .setTimestamp();
+
     if (leaderboard.length === 0) {
-        leaderboardText += '*Thật đáng tiếc, giải đấu kết thúc mà không một ai tích lũy được Sea Coins nào!*';
+        embedLeaderboard.setDescription('*Thật đáng tiếc, giải đấu kết thúc mà không một ai tích lũy được Sea Coins nào!*');
     } else {
         const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+        let leaderboardText = '';
         leaderboard.forEach(([pId, coins], index) => {
-            leaderboardText += `${medals[index]} <@${pId}>: Tích lũy **+${coins} Sea Coins** 🪙 trong giải đấu.\n`;
+            leaderboardText += `${medals[index]} <@${pId}>: Tích lũy **+${coins} Sea Coins** 🪙\n`;
         });
+        embedLeaderboard.setDescription(leaderboardText);
     }
 
-    leaderboardText += '\n✨ **Trận đấu khép lại hoàn chỉnh!** Các bạn có thể gõ `/batdau` để thực hiện một giải đấu mới tinh nhé!';
-    await channel.send({ content: leaderboardText }).catch(() => {});
+    await channel.send({ embeds: [embedLeaderboard] }).catch(() => {});
+    await channel.send('✨ **Trận đấu khép lại hoàn chỉnh!** Các bạn có thể gõ `/batdau` để thực hiện một giải đấu mới tinh nhé!');
 }
 
 client.login(process.env.DISCORD_TOKEN);
