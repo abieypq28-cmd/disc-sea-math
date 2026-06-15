@@ -1,5 +1,4 @@
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits, ButtonStyle } = require('discord.js');
-// Đảm bảo ButtonStyle được nhận diện chính xác cấu trúc Enum trong hệ thống
+const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
 
 // 1. WEB SERVER CHUẨN ĐỂ ĐÓN PING CRON-JOB TRÊN RENDER
@@ -127,22 +126,21 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply(`🔧 **Hệ thống Quản Trị:** Admin đã điều chỉnh ví của <@${targetUser.id}> thành **${amount} Sea Coins** 🪙.`);
         }
 
-        // LỆNH MỞ GIẢI ĐẤU TOÁN HỌC (/batdau) - FIX TRIỆT ĐỂ KHÔNG XOAY VÒNG
+        // LỆNH MỞ GIẢI ĐẤU TOÁN HỌC (/batdau)
         if (commandName === 'batdau') {
             if (isTournamentRunning) {
                 return interaction.reply({ content: '⚠️ Hệ thống đang chạy một giải đấu rồi! Không thể mở thêm giải đấu song song.', ephemeral: true });
             }
 
-            // Gửi tín hiệu hoãn phản hồi ngay lập tức để chặn đứng lỗi 3 giây của Discord
             await interaction.deferReply().catch(err => console.error("Lỗi hoãn reply:", err));
             isTournamentRunning = true; 
 
             const votes = { de: new Set(), trungbinh: new Set(), kho: new Set() };
 
-            // Đặt customId dạng trơn, không dùng dấu gạch dưới để tránh lỗi tách chuỗi split() bị nhầm lẫn
-            const btnDe = new ButtonBuilder().setCustomId('votede').setLabel('🟢 Dễ (0)').setStyle(ButtonStyle.Success);
-            const btnTrungBinh = new ButtonBuilder().setCustomId('votetrungbinh').setLabel('🟡 Trung Bình (0)').setStyle(ButtonStyle.Warning);
-            const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(ButtonStyle.Danger);
+            // SỬ DỤNG MÃ SỐ GỐC ĐỂ TRANH LỖI PHIÊN BẢN (3 = Xanh lá, 4 = Vàng, 5 = Đỏ)
+            const btnDe = new ButtonBuilder().setCustomId('votede').setLabel('🟢 Dễ (0)').setStyle(3);
+            const btnTrungBinh = new ButtonBuilder().setCustomId('votetrungbinh').setLabel('🟡 Trung Bình (0)').setStyle(4);
+            const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(5);
 
             const row = new ActionRowBuilder().addComponents(btnDe, btnTrungBinh, btnKho);
 
@@ -165,19 +163,17 @@ client.on('interactionCreate', async (interaction) => {
                 const vterId = btnInteract.user.id;
                 const clickedId = btnInteract.customId;
                 
-                // Trích xuất độ khó dựa trên ID nút bấm chính xác 100%
                 let chosenDiff = 'de';
                 if (clickedId === 'votetrungbinh') chosenDiff = 'trungbinh';
                 if (clickedId === 'votekho') chosenDiff = 'kho';
 
-                // Xóa phiếu cũ của người này ở các nhóm khác
                 for (const diff in votes) { votes[diff].delete(vterId); }
                 votes[chosenDiff].add(vterId);
 
                 const uRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('votede').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId('votetrungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(ButtonStyle.Warning),
-                    new ButtonBuilder().setCustomId('votekho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(ButtonStyle.Danger)
+                    new ButtonBuilder().setCustomId('votede').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(3),
+                    new ButtonBuilder().setCustomId('votetrungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(4),
+                    new ButtonBuilder().setCustomId('votekho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(5)
                 );
                 
                 await btnInteract.update({ components: [uRow] }).catch(() => {});
@@ -198,12 +194,11 @@ client.on('interactionCreate', async (interaction) => {
                     content: `🔔 **Hết giờ bầu chọn!** Đa số biểu quyết đã chốt cấp độ: **${diffLabel}**.\n🚀 **GIẢI ĐẤU CHÍNH THỨC KHỞI TRANH SAU 3 GIÂY!**`
                 }).catch(() => {});
 
-                // Bắt đầu vòng 1
                 runTournamentRound(interaction.channel, finalDiff, initialLives, reward, 1, {});
             });
         }
     } catch (globalError) {
-        console.error("Phát hiện lỗi nghiêm trọng khi xử lý Interaction:", globalError);
+        console.error("Lỗi Interaction:", globalError);
         isTournamentRunning = false;
     }
 });
@@ -212,7 +207,7 @@ client.on('interactionCreate', async (interaction) => {
 async function runTournamentRound(channel, difficulty, initialLives, reward, currentRound, tournamentStats) {
     if (currentRound > 20) { return endTournament(channel, tournamentStats); }
 
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Thời gian hồi sức 3 giây giữa mỗi vòng
+    await new Promise(resolve => setTimeout(resolve, 3000)); 
 
     try {
         const qData = generateSeaMath(difficulty);
@@ -245,7 +240,6 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
                 return m.reply(`🚫 Bạn đã hết sạch mạng ở vòng này rồi!`).catch(() => {});
             }
 
-            // TRƯỜNG HỢP 1: ĐOÁN ĐÚNG ĐÁP ÁN
             if (userAnswer === qData.answer) {
                 chatCollector.stop('winner');
                 if (!seaCoinsBalances[pId]) seaCoinsBalances[pId] = 0;
@@ -257,7 +251,6 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
                 return m.reply(`🎉 **XUẤT SẮC THẮNG VÒNG ${currentRound}!** 🎉\n👑 <@${pId}> đã nổ đáp án chuẩn xác nhất: **${qData.answer}**.\n💰 Tài khoản được cộng **+${reward} Sea Coins** 🪙.`).catch(() => {});
             }
 
-            // TRƯỜNG HỢP 2: ĐOÁN SAI KẾT QUẢ
             playerLives[pId]--;
 
             if (playerLives[pId] <= 0) {
@@ -285,8 +278,7 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
         });
 
     } catch (roundError) {
-        console.error(`Lỗi xảy ra tại vòng ${currentRound}:`, roundError);
-        await channel.send("⚠️ Gặp lỗi kỹ thuật nhỏ khi tạo đề toán. Hệ thống tự động bỏ qua và chuyển sang vòng tiếp theo!");
+        console.error(`Lỗi vòng ${currentRound}:`, roundError);
         runTournamentRound(channel, difficulty, initialLives, reward, currentRound + 1, tournamentStats);
     }
 }
