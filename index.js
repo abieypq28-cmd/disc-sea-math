@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits, ButtonStyle } = require('discord.js');
 const express = require('express');
 
 // 1. WEB SERVER CHUẨN ĐỂ ĐÓN PING CRON-JOB TRÊN RENDER
@@ -41,10 +41,15 @@ client.once('ready', async () => {
     console.log(`[HỆ THỐNG] Đã đăng nhập thành công: ${client.user.tag}`);
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
+        // ÉP DISCORD XÓA SẠCH TOÀN BỘ LỆNH CŨ BỊ KẸT TRÊN TOÀN CẦU
+        await rest.put(Routes.applicationCommands(client.user.id), { body: [] });
+        console.log('[HỆ THỐNG] Đã dọn rác lệnh cũ.');
+
+        // NẠP LẠI HỆ THỐNG LỆNH MỚI TINH
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('[HỆ THỐNG] Đã đồng bộ cấu trúc Slash Commands với Discord API!');
+        console.log('[HỆ THỐNG] Đã đồng bộ cấu trúc Slash Commands MỚI NHẤT thành công!');
     } catch (error) {
-        console.error(error);
+        console.error("Lỗi đồng bộ lệnh:", error);
     }
 });
 
@@ -137,10 +142,10 @@ client.on('interactionCreate', async (interaction) => {
 
             const votes = { de: new Set(), trungbinh: new Set(), kho: new Set() };
 
-            // SỬ DỤNG MÃ SỐ GỐC ĐỂ TRANH LỖI PHIÊN BẢN (3 = Xanh lá, 4 = Vàng, 5 = Đỏ)
-            const btnDe = new ButtonBuilder().setCustomId('votede').setLabel('🟢 Dễ (0)').setStyle(3);
-            const btnTrungBinh = new ButtonBuilder().setCustomId('votetrungbinh').setLabel('🟡 Trung Bình (0)').setStyle(4);
-            const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(5);
+            // FIX TRIỆT ĐỂ: Dùng ButtonStyle định dạng chữ viết hoa chuẩn hóa hệ thống của Discord.js v14
+            const btnDe = new ButtonBuilder().setCustomId('votede').setLabel('🟢 Dễ (0)').setStyle(ButtonStyle.Success);
+            const btnTrungBinh = new ButtonBuilder().setCustomId('votetrungbinh').setLabel('🟡 Trung Bình (0)').setStyle(ButtonStyle.Warning);
+            const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(ButtonStyle.Danger);
 
             const row = new ActionRowBuilder().addComponents(btnDe, btnTrungBinh, btnKho);
 
@@ -171,9 +176,9 @@ client.on('interactionCreate', async (interaction) => {
                 votes[chosenDiff].add(vterId);
 
                 const uRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('votede').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(3),
-                    new ButtonBuilder().setCustomId('votetrungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(4),
-                    new ButtonBuilder().setCustomId('votekho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(5)
+                    new ButtonBuilder().setCustomId('votede').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId('votetrungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(ButtonStyle.Warning),
+                    new ButtonBuilder().setCustomId('votekho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(ButtonStyle.Danger)
                 );
                 
                 await btnInteract.update({ components: [uRow] }).catch(() => {});
