@@ -1,13 +1,15 @@
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
 
-// 1. WEB SERVER GIỮ BOT LUÔN ONLINE ON RENDER
+// 1. WEB SERVER CHUẨN ĐỂ ĐÓN PING CRON-JOB TRÊN RENDER
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('Bot Giải Đấu Sea Coins Toán Học đang chạy 24/7!'));
-app.listen(PORT, () => console.log(`Web server đang chạy trên port ${PORT}`));
 
-// 2. CẤU HÌNH KHỞI TẠO BOT
+app.get('/', (req, res) => res.send('Bot Giải Đấu Sea Coins Toán Học đang chạy 24/7!'));
+// Lắng nghe trên 0.0.0.0 để Render quét cổng thành công, tránh bị lỗi sập bot sau 10 phút
+app.listen(PORT, '0.0.0.0', () => console.log(`[WEB] Server đang chạy mượt mà trên port ${PORT}`));
+
+// 2. CẤU HÌNH BOT DISCORD
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -20,7 +22,7 @@ const client = new Client({
 const seaCoinsBalances = {}; 
 let isTournamentRunning = false; // Trạng thái kiểm soát giải đấu toàn cục
 
-// 3. ĐĂNG KÝ HỆ THỐNG COMMAND LỆNH ỨNG DỤNG (SLASH COMMANDS)
+// 3. ĐĂNG KÝ HỆ THỐNG SLASH COMMANDS
 const commands = [
     new SlashCommandBuilder()
         .setName('batdau')
@@ -33,7 +35,7 @@ const commands = [
         .setDescription('Thay đổi số xu Sea Coins của một ai đó (Chỉ dành cho Admin/Chủ server)')
         .addUserOption(option => option.setName('user').setDescription('Thành viên nhận/bị trừ xu').setRequired(true))
         .addIntegerOption(option => option.setName('amount').setDescription('Số xu mới muốn thiết lập').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Khóa quyền, chỉ Admin nhìn thấy
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Chỉ Admin mới nhìn thấy lệnh này
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -47,7 +49,7 @@ client.once('ready', async () => {
     }
 });
 
-// 4. THUẬT TOÁN TỰ ĐỘNG RA ĐỀ TOÁN THEO TIÊU CHUẨN YÊU CẦU
+// 4. THUẬT TOÁN RA ĐỀ TOÁN TỰ ĐỘNG THEO TIÊU CHUẨN GỐC
 const randomNum = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 function generateSeaMath(difficulty) {
@@ -55,7 +57,6 @@ function generateSeaMath(difficulty) {
     let correctAnswer = 0;
 
     if (difficulty === 'de') {
-        // CẤP ĐỘ DỄ: Cộng trừ 2 chữ số trở xuống, chỉ duy nhất 1 phép tính
         const n1 = randomNum(10, 99);
         const n2 = randomNum(10, 99);
         const op = Math.random() > 0.5 ? '+' : '-';
@@ -66,7 +67,6 @@ function generateSeaMath(difficulty) {
         }
     } 
     else if (difficulty === 'trungbinh') {
-        // CẤP ĐỘ TRUNG BÌNH: 2 phép tính, số từ 3 chữ số trở xuống, kết hợp cộng trừ và nhân 1 chữ số
         const op1 = ['+', '-'][randomNum(0, 1)];
         const n1 = randomNum(100, 999); const n2 = randomNum(100, 999); const n_nhan = randomNum(2, 9);
         
@@ -81,7 +81,6 @@ function generateSeaMath(difficulty) {
         }
     } 
     else if (difficulty === 'kho') {
-        // CẤP ĐỘ KHÓ: Có từ 2 đến 4 phép tính đan xen, đầy đủ + - x :, số từ 3 chữ số trở xuống
         const numOps = randomNum(2, 4); 
         let expression = ''; 
         let currentVal = randomNum(10, 200); 
@@ -133,7 +132,10 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: '⚠️ Hệ thống đang chạy một giải đấu rồi! Không thể mở thêm giải đấu song song.', ephemeral: true });
         }
 
-        isTournamentRunning = true; // Khóa chốt hệ thống
+        // FIX LỖI "DID NOT RESPOND": Xin thêm thời gian xử lý từ Discord API ngay lập tức
+        await interaction.deferReply();
+
+        isTournamentRunning = true; 
         const votes = { de: new Set(), trungbinh: new Set(), kho: new Set() };
 
         const btnDe = new ButtonBuilder().setCustomId('vote_de').setLabel('🟢 Dễ (0)').setStyle(ButtonStyle.Success);
@@ -142,7 +144,8 @@ client.on('interactionCreate', async (interaction) => {
 
         const row = new ActionRowBuilder().addComponents(btnDe, btnTrungBinh, btnKho);
 
-        const voteMessage = await interaction.reply({
+        // Sử dụng editReply thay cho reply truyền thống vì đã kích hoạt deferReply ở trên
+        const voteMessage = await interaction.editReply({
             content: `🏆 **KHỞI ĐỘNG GIẢI ĐẤU TOÁN HỌC SEA COINS (20 VÒNG)** 🏆\nCác kỳ phùng thủ hãy có **30 giây** để bỏ phiếu biểu quyết độ khó chung cho toàn bộ giải đấu này!`,
             components: [row],
             fetchReply: true
@@ -180,23 +183,23 @@ client.on('interactionCreate', async (interaction) => {
                 content: `🔔 **Hết giờ bầu chọn!** Đa số biểu quyết đã chốt cấp độ: **${diffLabel}**.\n🚀 **GIẢI ĐẤU CHÍNH THỨC KHỞI TRANH SAU 3 GIÂY!**`
             });
 
-            // Triển khai đệ quy vòng 1
+            // Triển khai đệ quy bắt đầu vòng 1
             runTournamentRound(interaction.channel, finalDiff, initialLives, reward, 1, {});
         });
     }
 });
 
-// 6. HÀM CHẠY VÒNG ĐẤU TOÁN HỌC LIÊN TỤC 
+// 6. HÀM CHẠY VÒNG ĐẤU TOÁN HỌC LIÊN TỤC (ĐỆ QUY)
 async function runTournamentRound(channel, difficulty, initialLives, reward, currentRound, tournamentStats) {
     if (currentRound > 20) { return endTournament(channel, tournamentStats); }
 
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Thời gian hồi sức 3 giây giữa mỗi vòng
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Nghỉ 3 giây giữa mỗi trận
 
     const qData = generateSeaMath(difficulty);
-    console.log(`[DEBUG LOG] Vòng ${currentRound} | Đề: ${qData.text} | Đáp án gốc: ${qData.answer}`);
+    console.log(`[ĐỀ BÀI LOG] Vòng ${currentRound} | Đề: ${qData.text} | Đáp án: ${qData.answer}`);
 
     await channel.send({
-        content: `⚔️ **VÒNG ĐẤU: ${currentRound} / 20** ⚔️\n\n🔢 **ĐỀ BÀI:** Tính giá trị của biểu thức toán học sau:\n👉  **${qData.text} = ?** 👈\n\n⏱️ *Thời gian: **45 giây**. Hãy gõ trực tiếp kết quả số! Gõ sai quá số mạng cá nhân quy định sẽ bị loại.*`
+        content: `⚔️ **VÒNG ĐẤU: ${currentRound} / 20** ⚔️\n\n🔢 **ĐỀ BÀI:** Tính giá trị của biểu thức toán học sau:\n👉  **${qData.text} = ?** 👈\n\n⏱️ *Thời gian: **45 giây**. Hãy gõ kết quả số! Gõ sai quá số mạng cá nhân quy định sẽ bị loại.*`
     });
 
     const playerLives = {};
@@ -211,17 +214,17 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
         const pId = m.author.id;
         const userAnswer = parseInt(m.content.trim());
 
-        if (isNaN(userAnswer)) return; // Không quan tâm tin nhắn dạng văn bản chữ
+        if (isNaN(userAnswer)) return; // Bỏ qua nếu chat bằng chữ chữ viết thông thường
 
-        // Ghi danh người chơi mới nhập cuộc ở vòng đấu này
+        // Kích hoạt mạng cá nhân cho người chơi mới gõ ở vòng này
         if (playerLives[pId] === undefined) {
             playerLives[pId] = initialLives;
             activePlayersInRound.add(pId);
         }
 
-        // Kiểm tra xem người này trước đó đã cạn mạng chưa
+        // Chặn nếu người chơi này đã cạn mạng từ trước đó trong vòng
         if (playerLives[pId] <= 0) {
-            return m.reply(`🚫 Bạn đã hết sạch mạng ở vòng này rồi! Vui lòng giữ trật tự chờ vòng tiếp theo nhé.`);
+            return m.reply(`🚫 Bạn đã hết mạng ở vòng này! Vui lòng đợi vòng tiếp theo nhé.`);
         }
 
         // TRƯỜNG HỢP 1: THÀNH CÔNG ĐOÁN ĐÚNG ĐÁP ÁN ĐẦU TIÊN
@@ -242,13 +245,13 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
         if (playerLives[pId] <= 0) {
             m.reply(`💥 <@${pId}> đã gõ sai (${userAnswer}) và **CHÍNH THỨC BỊ LOẠI THI ĐẤU** tại vòng ${currentRound}! ❌`);
             
-            // Xem xem tất cả những người nãy giờ cày ở vòng này đã "ngỏm" hết chưa
+            // Tự động dừng vòng đấu sớm nếu tất cả những người tham gia đều đã hết sạch mạng
             const anyoneAlive = Array.from(activePlayersInRound).some(id => playerLives[id] > 0);
             if (!anyoneAlive && activePlayersInRound.size > 0) {
                 chatCollector.stop('all_dead');
             }
         } else {
-            return m.reply(`❌ **Kết quả sai!** <@${pId}> gõ số ${userAnswer}.\n⚠️ Mạng cá nhân của riêng bạn hiện tại còn: **${'❤️'.repeat(playerLives[pId])}**`);
+            return m.reply(`❌ **Kết quả sai!** <@${pId}> gõ số ${userAnswer}.\n⚠️ Mạng cá nhân còn: **${'❤️'.repeat(playerLives[pId])}**`);
         }
     });
 
@@ -257,18 +260,18 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
             await channel.send(`⏱️ **Hết thời gian quy định!** Không anh tài nào giải kịp.\n🤖 Đáp án chuẩn là: **${qData.answer}**.`);
         } 
         else if (reason === 'all_dead') {
-            await channel.send(`💀 **TẤT CẢ ĐỀU BỊ LOẠI!** Toàn bộ người tham gia vòng này đều đã cạn sạch mạng.\n🤖 Đáp án của bài toán là: **${qData.answer}**.`);
+            await channel.send(`💀 **TẤT CẢ ĐỀU BỊ LOẠI!** Toàn bộ đấu thủ tham gia vòng này đều đã cạn sạch mạng.\n🤖 Đáp án của bài toán là: **${qData.answer}**.`);
         }
 
-        // Gọi đệ quy dịch chuyển sang vòng kế tiếp
+        // Di chuyển đệ quy sang vòng đấu tiếp theo
         await channel.send(`⏩ *Hệ thống đang nạp dữ liệu Vòng ${currentRound + 1}...*`);
         runTournamentRound(channel, difficulty, initialLives, reward, currentRound + 1, tournamentStats);
     });
 }
 
-// 7. TỔNG KẾT BẢNG XẾP HẠNG GIẢI ĐẤU
+// 7. TỔNG KẾT BẢNG XẾP HẠNG GIẢI ĐẤU GIỮA CÁC ĐẤU THỦ
 async function endTournament(channel, tournamentStats) {
-    isTournamentRunning = false; // Giải phóng khóa bot toàn cục
+    isTournamentRunning = false; // Mở khóa trạng thái toàn cục để cho phép gõ /batdau lần sau
 
     const leaderboard = Object.entries(tournamentStats)
         .sort((a, b) => b[1] - a[1])
