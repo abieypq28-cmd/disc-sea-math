@@ -142,10 +142,10 @@ client.on('interactionCreate', async (interaction) => {
 
             const votes = { de: new Set(), trungbinh: new Set(), kho: new Set() };
 
-            // Đã đồng bộ mã số (3 = Xanh lá, 4 = Vàng, 5 = Đỏ)
+            // Sử dụng mã số nguyên (3 = Xanh lá, 4 = Vàng, 2 = Đỏ đục) để tương thích 100% mọi phiên bản thư viện
             const btnDe = new ButtonBuilder().setCustomId('votede').setLabel('🟢 Dễ (0)').setStyle(3);
             const btnTrungBinh = new ButtonBuilder().setCustomId('votetrungbinh').setLabel('🟡 Trung Bình (0)').setStyle(4);
-            const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(5);
+            const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(2);
 
             const row = new ActionRowBuilder().addComponents(btnDe, btnTrungBinh, btnKho);
 
@@ -175,11 +175,11 @@ client.on('interactionCreate', async (interaction) => {
                 for (const diff in votes) { votes[diff].delete(vterId); }
                 votes[chosenDiff].add(vterId);
 
-                // FIX TRIỆT ĐỂ TẠI ĐÂY: Chuyển toàn bộ uRow cập nhật sang dạng số (3, 4, 5) để tránh lỗi hoàn toàn!
+                // Đồng bộ mã số nút khi cập nhật số lượng vote
                 const uRow = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId('votede').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(3),
                     new ButtonBuilder().setCustomId('votetrungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(4),
-                    new ButtonBuilder().setCustomId('votekho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(5)
+                    new ButtonBuilder().setCustomId('votekho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(2)
                 );
                 
                 await btnInteract.update({ components: [uRow] }).catch(() => {});
@@ -276,7 +276,7 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
                 await channel.send(`⏱️ **Hết thời gian quy định!** Không anh tài nào giải kịp.\n🤖 Đáp án chuẩn là: **${qData.answer}**.`);
             } 
             else if (reason === 'all_dead') {
-                await channel.send(`💀 **TẤT CẢ ĐỀU BỊ LOẠI!** Toàn bộ người tham gia vòng này đều đã cạn sạch mạng.\n🤖 Đáp án của bài toán là: **${qData.answer}**.`);
+                await channel.send(`💀 **TẤT CẢ ĐỀ VỀ VƯỜN!** Toàn bộ người tham gia vòng này đều đã cạn sạch mạng.\n🤖 Đáp án của bài toán là: **${qData.answer}**.`);
             }
 
             await channel.send(`⏩ *Hệ thống đang nạp dữ liệu Vòng ${currentRound + 1}...*`);
