@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
 
 // 1. WEB SERVER CHUẨN ĐỂ ĐÓN PING CRON-JOB TRÊN RENDER
@@ -142,10 +142,10 @@ client.on('interactionCreate', async (interaction) => {
 
             const votes = { de: new Set(), trungbinh: new Set(), kho: new Set() };
 
-            // FIX TRIỆT ĐỂ: Dùng ButtonStyle định dạng chữ viết hoa chuẩn hóa hệ thống của Discord.js v14
-            const btnDe = new ButtonBuilder().setCustomId('votede').setLabel('🟢 Dễ (0)').setStyle(ButtonStyle.Success);
-            const btnTrungBinh = new ButtonBuilder().setCustomId('votetrungbinh').setLabel('🟡 Trung Bình (0)').setStyle(ButtonStyle.Warning);
-            const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(ButtonStyle.Danger);
+            // Đã đồng bộ mã số (3 = Xanh lá, 4 = Vàng, 5 = Đỏ)
+            const btnDe = new ButtonBuilder().setCustomId('votede').setLabel('🟢 Dễ (0)').setStyle(3);
+            const btnTrungBinh = new ButtonBuilder().setCustomId('votetrungbinh').setLabel('🟡 Trung Bình (0)').setStyle(4);
+            const btnKho = new ButtonBuilder().setCustomId('votekho').setLabel('🔴 Khó (0)').setStyle(5);
 
             const row = new ActionRowBuilder().addComponents(btnDe, btnTrungBinh, btnKho);
 
@@ -175,10 +175,11 @@ client.on('interactionCreate', async (interaction) => {
                 for (const diff in votes) { votes[diff].delete(vterId); }
                 votes[chosenDiff].add(vterId);
 
+                // FIX TRIỆT ĐỂ TẠI ĐÂY: Chuyển toàn bộ uRow cập nhật sang dạng số (3, 4, 5) để tránh lỗi hoàn toàn!
                 const uRow = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId('votede').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId('votetrungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(ButtonStyle.Warning),
-                    new ButtonBuilder().setCustomId('votekho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(ButtonStyle.Danger)
+                    new ButtonBuilder().setCustomId('votede').setLabel(`🟢 Dễ (${votes.de.size})`).setStyle(3),
+                    new ButtonBuilder().setCustomId('votetrungbinh').setLabel(`🟡 Trung Bình (${votes.trungbinh.size})`).setStyle(4),
+                    new ButtonBuilder().setCustomId('votekho').setLabel(`🔴 Khó (${votes.kho.size})`).setStyle(5)
                 );
                 
                 await btnInteract.update({ components: [uRow] }).catch(() => {});
@@ -203,7 +204,7 @@ client.on('interactionCreate', async (interaction) => {
             });
         }
     } catch (globalError) {
-        console.error("Lỗi Interaction:", globalError);
+        console.error("Lỗi Interaction tổng cục:", globalError);
         isTournamentRunning = false;
     }
 });
