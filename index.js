@@ -27,7 +27,7 @@ try {
     console.error("Lỗi cấu hình Google Sheets:", err.message);
 }
 
-const doc = new GoogleSpreadsheet('ID_SHEET_CUA_BAN', serviceAccountAuth);
+const doc = new GoogleSpreadsheet('1niJT8_BW420CWm3nY-QYXYo6DQXW02gYB3KJL4e8vas', serviceAccountAuth);
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const express = require('express');
 
