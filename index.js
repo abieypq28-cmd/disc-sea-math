@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { JWT } = require('google-auth-library');
 
@@ -10,7 +11,7 @@ const serviceAccountAuth = new JWT({
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
-const doc = new GoogleSpreadsheet('ID_SHEET_CUA_BAN_O_BUOC_1', serviceAccountAuth);
+const doc = new GoogleSpreadsheet('1niJT8_BW420CWm3nY-QYXYo6DQXW02gYB3KJL4e8vas', serviceAccountAuth);
 
 async function getBalance(userId) {
     await doc.loadInfo();
