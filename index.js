@@ -28,6 +28,27 @@ try {
 }
 
 const doc = new GoogleSpreadsheet('1niJT8_BW420CWm3nY-QYXYo6DQXW02gYB3KJL4e8vas', serviceAccountAuth);
+// --- DÁN HÀM updateBalance VÀO ĐÂY ---
+async function updateBalance(userId, amount) {
+    try {
+        await doc.loadInfo();
+        const sheet = doc.sheetsByIndex[0];
+        const rows = await sheet.getRows();
+        
+        let row = rows.find(r => r.get('userId') === userId);
+        
+        if (row) {
+            let current = parseInt(row.get('balance')) || 0;
+            row.set('balance', current + amount);
+            await row.save();
+        } else {
+            await sheet.addRow({ userId: userId, balance: amount });
+        }
+    } catch (err) {
+        console.error("Lỗi Google Sheets:", err);
+    }
+}
+// ------------------------------------
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const express = require('express');
 
