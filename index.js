@@ -1,3 +1,38 @@
+const { GoogleSpreadsheet } = require('google-spreadsheet');
+const { JWT } = require('google-auth-library');
+
+// Nếu trên Render thì lấy từ biến môi trường, trên máy thì lấy từ file JSON
+const creds = process.env.GOOGLE_CREDS ? JSON.parse(process.env.GOOGLE_CREDS) : require('./credentials.json');
+
+const serviceAccountAuth = new JWT({
+    email: creds.client_email,
+    key: creds.private_key,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+const doc = new GoogleSpreadsheet('ID_SHEET_CUA_BAN_O_BUOC_1', serviceAccountAuth);
+
+async function getBalance(userId) {
+    await doc.loadInfo();
+    const sheet = doc.sheetsByIndex[0];
+    const rows = await sheet.getRows();
+    const row = rows.find(r => r.get('userId') === userId);
+    return row ? parseInt(row.get('balance')) : 0;
+}
+
+async function updateBalance(userId, amount) {
+    await doc.loadInfo();
+    const sheet = doc.sheetsByIndex[0];
+    const rows = await sheet.getRows();
+    let row = rows.find(r => r.get('userId') === userId);
+    
+    if (row) {
+        row.set('balance', amount);
+        await row.save();
+    } else {
+        await sheet.addRow({ userId: userId, balance: amount });
+    }
+}
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ComponentType, REST, Routes, SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const express = require('express');
 
