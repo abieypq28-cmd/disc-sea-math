@@ -367,7 +367,7 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
             .setColor(0x9B59B6)
             .setTitle(`⚔️ VÒNG ĐẤU: ${currentRound} / 20 ⚔️`)
             .setDescription(`Hãy tính giá trị của biểu thức toán học sau:\n\n👉  **\`${qData.text}\` = ?** 👈\n\n⏱️ **Thời gian giới hạn:** <t:${roundEndTime}:R>`)
-            .setFooter({ text: `Phần thưởng vòng: ${reward} Sea Coins 🪙 | Bạn chỉ có đúng 20 giây!` });
+            .setFooter({ text: `Phần thưởng vòng: ${reward} Sea Coins <:tienxu:1516496597632946431> | Bạn chỉ có đúng 20 giây!` });
 
         await channel.send({ embeds: [embedQuestion] });
 
@@ -403,7 +403,7 @@ async function runTournamentRound(channel, difficulty, initialLives, reward, cur
                 const embedWin = new EmbedBuilder()
                     .setColor(0x2ECC71)
                     .setTitle(`🎉 VÒNG ${currentRound} ĐÃ CÓ NHÀ VÔ ĐỊCH 🎉`)
-                    .setDescription(`👑 <@${pId}> đã nổ đáp án chính xác: **\`${qData.answer}\`**\n💰 Tài khoản cá nhân nhận ngay **+${reward} Sea Coins** 🪙.`);
+                    .setDescription(`👑 <@${pId}> đã nổ đáp án chính xác: **\`${qData.answer}\`**\n💰 Tài khoản cá nhân nhận ngay **+${reward} Sea Coins** <:tienxu:1516496597632946431>.`);
                 return m.reply({ embeds: [embedWin] }).catch(() => {});
             }
 
