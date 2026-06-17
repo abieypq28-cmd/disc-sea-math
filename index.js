@@ -181,7 +181,7 @@ client.on('interactionCreate', async (interaction) => {
             const bal = seaCoinsBalances[userId] || 0;
             const embedVi = new EmbedBuilder()
                 .setColor(0x00AE86)
-                .setTitle('🪙 TÀI KHOẢN SEA COINS')
+                .setTitle('<:tienxu:1516496597632946431> TÀI KHOẢN SEA COINS')
                 .setDescription(`Chào <@${userId}>, số dư hiện tại của bạn là: **${bal} Sea Coins**`)
                 .setTimestamp();
             return interaction.reply({ embeds: [embedVi] });
@@ -213,7 +213,7 @@ client.on('interactionCreate', async (interaction) => {
 
             let desc = sorted.map((entry, i) => {
                 const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-                return `${medals[i]} <@${entry[0]}>: **${entry[1]}** 🪙`;
+                return `${medals[i]} <@${entry[0]}>: **${entry[1]}** <:tienxu:1516496597632946431>`;
             }).join('\n');
 
             const embed = new EmbedBuilder()
@@ -232,7 +232,7 @@ client.on('interactionCreate', async (interaction) => {
             const embedSet = new EmbedBuilder()
                 .setColor(0xFFA500)
                 .setTitle('🔧 ĐIỀU CHỈNH HỆ THỐNG')
-                .setDescription(`Admin đã thiết lập lại số dư của <@${targetUser.id}> thành **${amount} Sea Coins** 🪙.`);
+                .setDescription(`Admin đã thiết lập lại số dư của <@${targetUser.id}> thành **${amount} Sea Coins** <:tienxu:1516496597632946431>.`);
             return interaction.reply({ embeds: [embedSet] });
         }
 
@@ -327,10 +327,10 @@ client.on('interactionCreate', async (interaction) => {
                 if (votes.trungbinh.size > maxVotes) { finalDiff = 'trungbinh'; maxVotes = votes.trungbinh.size; }
                 if (votes.kho.size > maxVotes) { finalDiff = 'kho'; }
 
-                let reward = 15; let initialLives = 5; let diffLabel = '🟢 DỄ (15🪙/câu | 5 Mạng | 20s)';
+                let reward = 15; let initialLives = 5; let diffLabel = '🟢 DỄ (15<:tienxu:1516496597632946431>/câu | 5 Mạng | 20s)';
                 let colorHex = 0x2ECC71;
-                if (finalDiff === 'trungbinh') { reward = 50; initialLives = 3; diffLabel = '🟡 TRUNG BÌNH (50🪙/câu | 3 Mạng | 20s)'; colorHex = 0xF1C40F; }
-                if (finalDiff === 'kho') { reward = 100; initialLives = 2; diffLabel = '🔴 KHÓ VÔ HẠN (100🪙/câu | 2 Mạng | 20s)'; colorHex = 0xE74C3C; }
+                if (finalDiff === 'trungbinh') { reward = 50; initialLives = 3; diffLabel = '🟡 TRUNG BÌNH (50<:tienxu:1516496597632946431>/câu | 3 Mạng | 20s)'; colorHex = 0xF1C40F; }
+                if (finalDiff === 'kho') { reward = 100; initialLives = 2; diffLabel = '🔴 KHÓ VÔ HẠN (100<:tienxu:1516496597632946431>/câu | 2 Mạng | 20s)'; colorHex = 0xE74C3C; }
 
                 const embedEndVote = new EmbedBuilder()
                     .setColor(colorHex)
@@ -479,7 +479,7 @@ async function endTournament(channel, tournamentStats) {
         const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
         let leaderboardText = '';
         leaderboard.forEach(([pId, coins], index) => {
-            leaderboardText += `${medals[index]} <@${pId}>: Tích lũy **+${coins} Sea Coins** 🪙\n`;
+            leaderboardText += `${medals[index]} <@${pId}>: Tích lũy **+${coins} Sea Coins** <:tienxu:1516496597632946431>\n`;
         });
         embedLeaderboard.setDescription(leaderboardText);
     }
